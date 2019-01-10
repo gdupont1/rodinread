@@ -1,3 +1,12 @@
+{-|
+Module      : RodinContext.TeX
+Description : Module for converting a Rodin context in LaTeX
+Copyright   : (c) Guillaume Dupont, 2018
+License     : MIT
+Maintainer  : guillaume.dupont55@gmail.com
+
+This module converts (/ "pretty prints") a Rodin context in LaTeX.
+-}
 module RodinContext.TeX where
 
 import Util

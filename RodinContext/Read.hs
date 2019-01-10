@@ -1,3 +1,12 @@
+{-|
+Module      : RodinContext.Read
+Description : Rodin Context XML file reader
+Copyright   : (c) Guillaume Dupont, 2018
+License     : MIT
+Maintainer  : guillaume.dupont55@gmail.com
+
+Module for reading a Rodin context (.buc) as an XML File.
+-}
 module RodinContext.Read (
         parseContextFile
     ) where

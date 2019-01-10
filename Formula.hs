@@ -1,6 +1,16 @@
+{-|
+Module      : Formula
+Description : module for representing a general Event-B formula
+Copyright   : (c) Guillaume Dupont, 2018
+License     : MIT
+Maintainer  : guillaume.dupont55@gmail.com
+
+This top level module mainly contains the datatypes representing a formula.
+Submodules contains other functionalities like tokenization or printing.
+-}
 module Formula where
 
-
+-- | An Event-B operator
 data Operator =
       Top
     | Bottom
@@ -67,18 +77,21 @@ data Operator =
     | OfType
     deriving (Eq,Ord,Enum,Show)
 
+-- | An reserved identifier that should be represented by a special symbol
 data SpecialIdent =
       Integers
     | Naturals
     | Naturals1
     deriving (Eq,Ord,Enum,Show)
 
+-- | Some kind of white space
 data Space =
       SimpleSpace
     | Newline
     | Tab
     deriving (Eq,Ord,Enum,Show)
 
+-- | Other types of tokens, mainly parentheses/brackets, comas, dot and mid (used as delimiters)
 data SimpleToken =
       TokOpenPar
     | TokClosePar
@@ -91,16 +104,18 @@ data SimpleToken =
     | TokMid
     deriving (Eq,Ord,Enum,Show)
 
+-- | Main type : a token in the formula
 data Token =
-      TokUndef
-    | TokOp Operator
-    | TokSpecialIdent SpecialIdent
-    | TokOpIdent String
-    | TokIdent String
-    | TokSpace Space
-    | TokToken SimpleToken
+      TokUndef                         -- ^ Undefined token
+    | TokOp Operator                   -- ^ Operator
+    | TokSpecialIdent SpecialIdent     -- ^ Special identifier
+    | TokOpIdent String                -- ^ Identifier corresponding to an operator
+    | TokIdent String                  -- ^ Any other identifier
+    | TokSpace Space                   -- ^ A white space
+    | TokToken SimpleToken             -- ^ Some other "top-level" token
     deriving Show
 
+-- | A formula is a list of tokens
 type Formula = [Token]
 
 

@@ -1,78 +1,104 @@
+{-|
+Module      : RodinTheory
+Description : Description of a theory in Rodin (as a syntactical tree)
+Copyright   : (c) Guillaume Dupont, 2018
+License     : MIT
+Maintainer  : guillaume.dupont55@gmail.com
+
+This describes a Rodin theory, defining the Theory type.
+Other submodules are responsible for other features.
+-}
 module RodinTheory where
 
 import Formula (Formula)
 
+-- | Operator notation type
 data NotationType = Prefix | Infix
+
+-- | Operator properties: intermediate representation used in the operator definition
 data OperatorProp =
     OperatorProp {
-        associative  :: Bool,
-        commutative  :: Bool,
-        formulaType  :: Bool,
-        notationType :: NotationType
+        associative  :: Bool,                               -- ^ Is the operator associative
+        commutative  :: Bool,                               -- ^ Is the operator commutative
+        formulaType  :: Bool,                               -- ^ Is the operator an expression or a predicate
+        notationType :: NotationType                        -- ^ Operator's notation type
     }
+-- | An operator argument
 data OperatorArgument =
     OperatorArgument {
-        expression :: Formula,
-        identifier :: String
+        expression :: Formula,                              -- ^ Operator's type
+        identifier :: String                                -- ^ Operator's identifier
     }
+-- | An operator well-definedness condition
 data OperatorWDCondition =
     OperatorWDCondition {
-        predicate :: Formula
+        predicate :: Formula                                -- ^ Well-definedness predicate
     }
+-- | Operator's direct definition
 data OperatorDirectDefinition =
     OperatorDirectDefinition {
-        formula :: Formula
+        formula :: Formula                                  -- ^ Direct definition formula
     }
+-- | Operator's recursive definition's case
 data RecursiveDefinitionCase =
     RecursiveDefinitionCase {
-        caseExpression :: Formula,
-        caseFormula    :: Formula
+        caseExpression :: Formula,                          -- ^ Case's expression (what it matches against)
+        caseFormula    :: Formula                           -- ^ Case's formula (its definition)
     }
+-- | Operator's recursive definition
 data OperatorRecursiveDefinition =
     OperatorRecursiveDefinition {
-        inductiveArgument :: String,
-        cases             :: [RecursiveDefinitionCase]
+        inductiveArgument :: String,                        -- ^ Recursive definition's inductive argument (what should be matched)
+        cases             :: [RecursiveDefinitionCase]      -- ^ List of cases
     }
 
+-- | Theory import
 data ImportTheory =
     ImportTheory {
-        theory :: String
+        theory :: String                                    -- ^ Import target
     }
+-- | Theory project import
 data ImportTheoryProject =
     ImportTheoryProject {
-        project  :: String,
-        theories :: [ImportTheory]
+        project  :: String,                                 -- ^ Import target (project name)
+        theories :: [ImportTheory]                          -- ^ Theories to be imported from that project
     }
 
+-- | Theory's type parameter
 data TypeParameter =
     TypeParameter {
-        typeIdentifier :: String
+        typeIdentifier :: String                            -- ^ Type's identifier
     }
 
+-- | Data type construtor argument
 data ConstructorArgument =
     ConstructorArgument {
-        caId   :: String,
-        caType :: Formula
+        caId   :: String,                                   -- ^ Argument's identifier
+        caType :: Formula                                   -- ^ Argument's type
     }
+-- | Data type constructor
 data DataTypeConstructor =
     DataTypeConstructor {
-        dtcId :: String,
-        args :: [ConstructorArgument]
+        dtcId :: String,                                    -- ^ Constructor's identifier
+        args :: [ConstructorArgument]                       -- ^ Constructor's arguments
     }
+-- | Data type type argument
 data TypeArgument =
     TypeArgument {
-        typeArg :: Formula
+        typeArg :: Formula                                  -- ^ Type formula
     }
+-- | Data type definition
 data DataTypeDefinition =
     DataTypeDefinition {
-        dtId          :: String,
-        typeArguments :: [TypeArgument],
-        constructors  :: [DataTypeConstructor]
+        dtId          :: String,                            -- ^ Data type identifier
+        typeArguments :: [TypeArgument],                    -- ^ Data type type arguments
+        constructors  :: [DataTypeConstructor]              -- ^ Data type constructors
     }
 
+-- | Operator definition
 data NewOperatorDefinition =
     NewOperatorDefinition {
-        opLabel  :: String,
+        opLabel  :: String,                                 -- ^ 
         opProp   :: OperatorProp,
         opArgs   :: [OperatorArgument],
         opWD     :: [OperatorWDCondition],
