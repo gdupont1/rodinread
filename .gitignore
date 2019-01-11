@@ -2,3 +2,5 @@
 *.o
 **/*.hi
 **/*.o
+dist
+Main
