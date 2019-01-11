@@ -28,6 +28,7 @@ import RodinMachine.Ascii
 import RodinPO (POFile)
 import RodinPO.Read
 import RodinPO.TeX
+import RodinPO.Ascii
 --import RodinPO.Ascii
 import Data.List (lookup)
 import Data.List.Split (splitOn)
@@ -75,7 +76,7 @@ instance ShowAscii Parsed where
   showAscii (PContext ct) = showAscii ct
   showAscii (PMachine ma) = showAscii ma
   showAscii (PTheory  th) = showAscii th
-  showAscii (PPOFile  po) = "__unsupported__"
+  showAscii (PPOFile  po) = showAscii po
 
 -- | Create a parser for a parsable object based on its actual parser.
 -- This will basically take any parser of the form String -> IO a to a parser of the form String -> IO Parsed (effectively doing the wrapping).
@@ -141,6 +142,7 @@ printHelp = do
     putStrLn "  Context description files (.buc)"
     putStrLn "  Machine description files (.bum)"
     putStrLn "  Theory description files (.tuf)"
+    putStrLn "  Proof obligation files (.bpo)"
     putStrLn ""
 
 -- | Read the argument options and return either a Nothing if there is nothing to do or a writing configuration + a set of reading configurations associated with file names.
