@@ -17,30 +17,31 @@ import Formula.Util
 import Formula.TeX
 import Data.List (intercalate)
 
-guessName :: String -> String -> String
-guessName pre "CTXHYP" = pre ++ "Hypotheses from context:\n"
-guessName pre "ABSHYP" = pre ++ "Hypotheses from abstract machine:\n"
-guessName _   "SEQHYP" = ""
-guessName pre x = pre ++ x ++ ":\n"
+guessName :: String -> String
+guessName "CTXHYP" = "Hypotheses from context:"
+guessName "ABSHYP" = "Hypotheses from abstract machine:"
+guessName "SEQHYP" = ""
+guessName x = x 
 
 instance ShowTeX POIdentifier where
-  showTeX (POIdentifier na ty) = na ++ " " ++ (printTeX ((TokOp OfType):ty))
+  showTeX (POIdentifier na ty) = na ++ " " ++ (printTeX ((TokOp OfType):(TokSpace SimpleSpace):ty))
 
 instance ShowTeX POPredicate where
-  showTeX (POPredicate _ pr _) = printTeX pr
+  showTeX (POPredicate _ pr _) = printTeX $ removeAloneParentheses $ untype $ pr
 
 instance ShowTeX POPredicateSet where
   showTeX (POPredicateSet na _ _ ids prs) =
-      (guessName "    " na)
-      ++ "    let " ++ (intercalate "\n        " $ map showTeX ids) ++ "\n"
-      ++ "    hyp " ++ (intercalate "\n        " $ map showTeX prs) ++ "\n"
+      (guessName na)
+      ++ (if not $ null ids then "\n    let " ++ (intercalate "\n        " $ map showTeX ids) else "")
+      ++ (if not $ null prs then "\n    hyp " ++ (intercalate "\n        " $ map showTeX prs) else "")
+      ++ "\n"
 
 instance ShowTeX POSequent where
   showTeX (POSequent na _ de _ ps prs _ _) =
       na ++ ":" ++ (if not $ null de then " -- " ++ de else "")
       ++ (intercalate "" $ map showTeX ps)
-      ++ "\\vdash\n"
-      ++ (intercalate "\n    " $ map showTeX prs)
+      ++ "$\\vdash$\n"
+      ++ "    " ++ (intercalate "\n    " $ map showTeX prs)
       ++ "\n"
 
 instance ShowTeX POFile where
