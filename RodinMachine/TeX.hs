@@ -28,11 +28,11 @@ instance ShowTeX Variable where
 instance ShowTeX Invariant where
   showTeX (Invariant lb pr) =
       "\n" ++ ind 1 ++ lb ++ ": " ++
-          (if any isNewline pr then printTeXLines 2 else printTeX) pr
+          (if any isNewline pr then printTeXLines'' 2 else math . printTeX') pr
 
 instance ShowTeX Variant where
   showTeX (Variant ex) =
-      tail $ printTeXLines 1 ex
+      tail $ printTeXLines'' 1 ex
 
 instance ShowTeX RefinesEvent where
   showTeX (RefinesEvent ev) = ev
@@ -43,17 +43,17 @@ instance ShowTeX Parameter where
 instance ShowTeX Guard where
   showTeX (Guard lb pr) =
       "\n" ++ ind 2 ++ lb ++ ": " ++
-          (if any isNewline pr then printTeXLines 3 else printTeX) pr
+          (if any isNewline pr then printTeXLines'' 3 else math . printTeX') pr
 
 instance ShowTeX Witness where
   showTeX (Witness lb pr) =
       "\n" ++ ind 2 ++ lb ++ ": " ++
-          (if any isNewline pr then printTeXLines 3 else printTeX) pr
+          (if any isNewline pr then printTeXLines'' 3 else math . printTeX') pr
 
 instance ShowTeX Action where
   showTeX (Action lb pr) =
       "\n" ++ ind 2 ++ lb ++ ": " ++
-          (if any isNewline pr then printTeXLines 3 else printTeX) pr
+          (if any isNewline pr then printTeXLines'' 3 else math . printTeX') pr
 
 instance ShowTeX ConvergenceType where
   showTeX Ordinary = ""

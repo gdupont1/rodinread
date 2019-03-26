@@ -11,7 +11,7 @@ module Formula.Util where
 
 import Util
 import Formula
-import Formula.Tokenizer
+--import Formula.Tokenizer
 import Data.List.Split (splitWhen)
 
 
@@ -83,6 +83,11 @@ removeAloneParentheses tks =
           aux Nothing ((TokToken TokOpenPar):i:(TokToken TokClosePar):xs) = i:(aux Nothing xs)
           aux (Just (TokOp o)) l@((TokToken TokOpenPar):i:(TokToken TokClosePar):xs)
               | not $ functionLike o = i:(aux Nothing xs)
+              | otherwise = (head l):(aux (Just $ head l) (tail l))
+          aux (Just (TokSpace _)) l@((TokToken TokOpenPar):i:(TokToken TokClosePar):xs) =
+              i:(aux Nothing xs)
+          aux (Just (TokToken x)) l@((TokToken TokOpenPar):i:(TokToken TokClosePar):xs)
+              | x /= TokClosePar = i:(aux Nothing xs)
               | otherwise = (head l):(aux (Just $ head l) (tail l))
           aux _ (x:xs) = x:(aux (Just x) xs)
 

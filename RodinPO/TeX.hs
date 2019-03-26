@@ -16,18 +16,27 @@ import Formula
 import Formula.Util
 import Formula.TeX
 import Data.List (intercalate)
+import Data.List.Split (splitOn)
 
 guessName :: String -> String
-guessName "CTXHYP" = "Hypotheses from context:"
-guessName "ABSHYP" = "Hypotheses from abstract machine:"
+guessName "CTXHYP" = bold "Hypotheses from context:"
+guessName "ABSHYP" = bold "Hypotheses from abstract machine:"
 guessName "SEQHYP" = ""
-guessName x = x 
+guessName x = bold (escape_ x) 
 
 instance ShowTeX POIdentifier where
-  showTeX (POIdentifier na ty) = na ++ " " ++ (printTeX ((TokOp OfType):(TokSpace SimpleSpace):ty))
+  showTeX (POIdentifier na ty) = math $ (escape_ na) ++ " " ++ (printTeX' ((TokOp OfType):(TokSpace SimpleSpace):ty))
 
 instance ShowTeX POPredicate where
-  showTeX (POPredicate _ pr _) = printTeX $ removeAloneParentheses $ untype $ pr
+  showTeX (POPredicate _ pr _) =
+      math
+      $ (++) "\\hphantom{\\wedge}\\ "
+      $ intercalate "$\n    $\\wedge\\ "
+      $ map (printTeX')
+      $ splitOn [TokOp And]
+      $ removeAloneParentheses
+      $ untype
+      $ pr
 
 instance ShowTeX POPredicateSet where
   showTeX (POPredicateSet na _ _ ids prs) =
@@ -38,7 +47,7 @@ instance ShowTeX POPredicateSet where
 
 instance ShowTeX POSequent where
   showTeX (POSequent na _ de _ ps prs _ _) =
-      na ++ ":" ++ (if not $ null de then " -- " ++ de else "")
+      bold (escape_ na) ++ ":" ++ (if not $ null de then " -- " ++ de else "")
       ++ (intercalate "" $ map showTeX ps)
       ++ "$\\vdash$\n"
       ++ "    " ++ (intercalate "\n    " $ map showTeX prs)

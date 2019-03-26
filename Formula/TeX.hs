@@ -15,6 +15,7 @@ import Formula.Util
 import TeX
 import Data.List (intercalate)
 import Data.List.Split (splitWhen, splitOn)
+import Data.Char (isAlpha,isAlphaNum)
 
 instance ShowTeX Operator where
   showTeX Top = "\\top"
@@ -111,6 +112,28 @@ instance ShowTeX Token where
   showTeX (TokSpace s) = showTeX s
   showTeX (TokToken t) = showTeX t
 
+printTeX' :: [Token] -> String
+printTeX' tks =
+    print1 "" tks
+    --    print1 previous current
+    where print1 _  []     = ""
+          print1 st (x:xs) =
+              let xx = xShowTeX x
+                in (space st xx) ++ xx ++ (print1 xx xs)
+          space st xx =
+              case st of
+                '\\':_ -> if isAlphaNum $ head xx then " " else ""
+                _      -> ""
+          xShowTeX (TokIdent id) =
+              case id of
+                [] -> ""
+                (x:xs) | null xs || (not $ isAlpha x) || (all (not . isAlpha) xs) -> id
+                --_ | '"' `elem` id ->
+                _ | otherwise -> "\\mathit{" ++ escape_ id ++ "}"
+          xShowTeX (TokToken TokOpenCBra) = "\\{"
+          xShowTeX (TokToken TokCloseCBra) = "\\}"
+          xShowTeX x = showTeX x
+
 printTeX :: [Token] -> String
 printTeX tks =
     withMath False tks
@@ -120,6 +143,10 @@ printTeX tks =
                   let next = withMath ism xs in
                       (if (m && ism) || ((not m) && (not ism)) then "" else "$") ++ showTeX x ++ next
           -- withMath (math mode on) (tokens)
+
+
+printTeXLines'' :: Int -> [Token] -> String
+printTeXLines'' = printLines (mathspace . printTeX')
 
 printTeXLines' :: [Token] -> [String]
 printTeXLines' = printLines' printTeX

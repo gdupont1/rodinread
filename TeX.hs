@@ -10,6 +10,7 @@ extended description...
 module TeX where
 
 import Util
+import Data.Char (isSpace)
 
 class ShowTeX a where
   showTeX :: a -> String
@@ -19,6 +20,11 @@ escape = circle "(*" "*)"
 
 math :: String -> String
 math = circle "$" "$"
+
+mathspace :: String -> String
+mathspace input =
+    let (spaces,remaining) = span isSpace input in
+        spaces ++ (math remaining)
 
 bold :: String -> String
 bold = escape . circle "\\textbf{" "}"
@@ -30,7 +36,9 @@ texlist :: (ShowTeX a) => String -> [a] -> String
 texlist = printlist showTeX
 
 escape_ :: String -> String
-escape_ = foldl (++) "" . map (\x -> if x == '_' then "\\_" else [x])
+escape_ =
+    foldl (++) "" . map (\x -> if x `elem` needescape then ['\\',x] else [x])
+    where needescape = "_\\{}[]^"
 
 
 

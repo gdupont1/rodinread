@@ -113,7 +113,7 @@ data Token =
     | TokIdent String                  -- ^ Any other identifier
     | TokSpace Space                   -- ^ A white space
     | TokToken SimpleToken             -- ^ Some other "top-level" token
-    deriving Show
+    deriving (Show,Eq)
 
 -- | A formula is a list of tokens
 type Formula = [Token]
