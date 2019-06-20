@@ -6,7 +6,11 @@ import Substitution
 
 instance Substituable RefinesMachine 
 instance Substituable SeesContext
-instance Substituable Variable
+
+instance Substituable Variable where
+  substitute st var =
+      (substitute st $ vaIdentifier var) >>= (\x -> return $ var { vaIdentifier = x })
+
 
 instance Substituable Invariant where
   substitute st inv =
@@ -17,14 +21,21 @@ instance Substituable Variant where
       (substitute st $ varExpression var) >>= (\x -> return $ var { varExpression = x })
 
 instance Substituable RefinesEvent
-instance Substituable Parameter
+
+instance Substituable Parameter where
+  substitute st par =
+      (substitute st $ paIdentifier par) >>= (\x -> return $ par { paIdentifier = x })
+
+
 instance Substituable Guard where
   substitute st grd =
       (substitute st $ guPred grd) >>= (\x -> return $ grd { guPred = x })
 
 instance Substituable Witness where
-  substitute st wit =
-      (substitute st $ wiPred wit) >>= (\x -> return $ wit { wiPred = x })
+  substitute st wit = do
+      wilab <- substitute st $ wiLabel wit
+      wipre <- substitute st $ wiPred wit
+      return $ wit { wiPred = wipre, wiLabel = wilab }
 
 instance Substituable Action where
   substitute st act =

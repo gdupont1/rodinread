@@ -13,9 +13,11 @@ module Formula.Tokenizer (
     reduce,
     tkn,
     replaceEntities,
-    FormulaParseError,fpe_position,fpe_fragment,fpe_message
+    FormulaParseError,FormulaParseWarning,
+    fpe_position,fpe_fragment,fpe_message
     ) where
 
+import Wrap
 import Formula
 import Formula.UTF8
 import Formula.Ascii
@@ -29,9 +31,6 @@ import Data.Function (on)
 isSpaceTk :: Token -> Bool
 isSpaceTk (TokSpace _) = True
 isSpaceTk _ = False
-
-reduce :: Either String [Token] -> [Token]
-reduce = filter (not . isSpaceTk) . fromRight []
 
 data Nature = Void | Number | Ident | Operator | Quote | Space deriving (Enum,Eq)
 
@@ -123,33 +122,39 @@ instance Show FormulaParseError where
   show pe =
       "Error:" ++ show (ftkposition $ fragment pe) ++ ": at '" ++ (ftkcontent $ fragment pe) ++ "', " ++ (message pe)
 
+data FormulaParseWarning
 
-extract :: (Token -> String) -> [FTk] -> Either FormulaParseError [Token]
+type FPWrap = Wrap FormulaParseError FormulaParseWarning
+
+reduce :: FPWrap [Token] -> [Token]
+reduce = filter (not . isSpaceTk) . getContent []
+
+extract :: (Token -> String) -> [FTk] -> FPWrap [Token]
 extract printer tks =
     getTkns tks
-    where getTkns :: [FTk] -> Either FormulaParseError [Token]
-          getTkns [] = Right []
+    where getTkns :: [FTk] -> FPWrap [Token]
+          getTkns [] = return []
           getTkns l@(tk:tks)
             | ftknature tk == Operator =
                 let (op,rem) = span ((== Operator) . ftknature) l in
                     (++) <$> guessOps tk (reverse op) [] <*> getTkns rem
             | otherwise =
                 (++) <$> getOneTk tk <*> getTkns tks
-          getOneTk :: FTk -> Either FormulaParseError [Token]
+          getOneTk :: FTk -> FPWrap [Token]
           getOneTk f@(FTk ct na po) 
-            | na == Number   = Right [TokIdent ct]
-            | na == Space    = Right [parseTk printer TokSpace SimpleSpace ct]
-            | na == Ident    = Right [search ct]
+            | na == Number   = return $ [TokIdent ct]
+            | na == Space    = return $ [parseTk printer TokSpace SimpleSpace ct]
+            | na == Ident    = return $ [search ct]
             | na == Quote    =
                 if last ct /= '"' then
-                  Left $ FormulaParseError f $ "Unclosed quote"
+                  failwith' FormulaParseError f $ "Unclosed quote"
                 else
-                  let ct' = init $ tail $ ct in Right [search ct']
+                  let ct' = init $ tail $ ct in return [search ct']
             | na == Operator =
                 case search ct of
-                  TokIdent _ -> Left $ FormulaParseError f $ "Unexpected operator '" ++ ct ++ "'"
-                  tk         -> Right [tk]
-            | na == Void = Right []
+                  TokIdent _ -> failwith' FormulaParseError f $ "Unexpected operator '" ++ ct ++ "'"
+                  tk         -> return [tk]
+            | na == Void = return []
           search :: String -> Token
           search tk
             | isTk printer TokOp           Top         tk = parseTk printer TokOp           Top         tk
@@ -158,19 +163,18 @@ extract printer tks =
             | isTk printer TokToken        TokOpenPar  tk = parseTk printer TokToken        TokOpenPar  tk
             | otherwise = TokIdent tk
           --          Ctxt   Consid.  Remainder
-          guessOps :: FTk -> [FTk] -> [FTk] -> Either FormulaParseError [Token]
-          guessOps ctx [] [] =
-            Right []
-          guessOps ctx [] rem = Left $ FormulaParseError ctx $ "Unexpected operator(s)"
+          guessOps :: FTk -> [FTk] -> [FTk] -> FPWrap [Token]
+          guessOps ctx [] []  = return []
+          guessOps ctx [] rem = failwith' FormulaParseError ctx $ "Unexpected operator(s)"
           guessOps ctx cs rem =
               let red = reduction $ reverse cs in
                 case search $ ftkcontent red of
                   TokIdent id ->
                       guessOps ctx (tail cs) ((head cs):rem)
                   tk ->
-                      case guessOps ctx (reverse rem) [] of
-                        Left _ -> guessOps ctx ((head rem):cs) (tail rem) -- guessOps ctx [] [] yields Right [] so in this case rs /= []
-                        Right tks -> Right $ tk:tks
+                      let mop = guessOps ctx (reverse rem) [] in
+                          if isError mop then guessOps ctx ((head rem):cs) (tail rem)
+                          else (tk:) <$> mop
           reduction :: [FTk] -> FTk
           reduction r = (head r) { ftkcontent = foldl (\acc -> \x -> acc ++ (ftkcontent x)) "" r }
           isTk :: (Enum a) => (Token -> String) -> (a -> Token) -> a -> String -> Bool
@@ -193,11 +197,11 @@ replaceEntities s@(x:xs)
           replaceOne "amp" = "&"
           replaceOne ('#':xs) = [C.chr $ read xs]
 
-tokenize :: (Token -> String) -> String -> Either FormulaParseError Formula
+tokenize :: (Token -> String) -> String -> FPWrap Formula
 tokenize printer = extract printer . explode
 
 tkn :: String -> Formula
-tkn = fromRight [] . tokenize showUTF8 . replaceEntities
+tkn = getContent [] . tokenize showUTF8 . replaceEntities
 
 
 

@@ -24,7 +24,7 @@ data SeesContext = SeesContext {
 
 -- | A variable
 data Variable = Variable {
-    vaIdentifier :: String                  -- ^ Variable's identifier
+    vaIdentifier :: Formula                  -- ^ Variable's identifier
 }
 
 -- | An invariant
@@ -45,7 +45,7 @@ data RefinesEvent = RefinesEvent {
 
 -- | Event parameter
 data Parameter = Parameter {
-    paIdentifier :: String                  -- ^ Parameter's identifier
+    paIdentifier :: Formula                  -- ^ Parameter's identifier
 }
 
 -- | Event guard
@@ -56,7 +56,7 @@ data Guard = Guard {
 
 -- | Event witness
 data Witness = Witness {
-    wiLabel :: String,                      -- ^ Witness' label
+    wiLabel :: Formula,                     -- ^ Witness' label
     wiPred :: Formula                       -- ^ Witness' expression
 }
 

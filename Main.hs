@@ -12,7 +12,9 @@ module Main where
 import System.Environment
 import Control.Monad (forM_)
 
-import Substitution
+import Wrap
+import Substitution (substitute)
+import Substitution.Rule (SubstitutionTable)
 import Options
 
 data Conf = Conf {
@@ -105,12 +107,12 @@ process conf = do
     putStrLn $ "Parsing " ++ (readerName $ reader conf) ++ " file " ++ (filename conf)
     content <- processor (reader conf) (filename conf)
     putStrLn $ "Performing substitution..."
-    case substitute (substitutions conf) content of
-      Left e -> putStrLn $ "Error while performing substitution on file " ++ (filename conf) ++ ":\n" ++ show e
-      Right ct -> do 
-        putStrLn $ "Writing " ++ (writerName $ writer conf) ++ " file " ++ (filename conf) ++ "." ++ (writerExtension $ writer conf) ++ "..."
-        writeOut (writer conf) (filename conf) (outdir conf) ct
-        putStrLn $ "Done."
+    doOrFail printErr write $ substitute (substitutions conf) content
+    where printErr e = putStrLn $ "Error while performing substitution on file " ++ (filename conf) ++ ":\n" ++ show e
+          write ct = do
+              putStrLn $ "Writing " ++ (writerName $ writer conf) ++ " file " ++ (filename conf) ++ "." ++ (writerExtension $ writer conf) ++ "..."
+              writeOut (writer conf) (filename conf) (outdir conf) ct
+              putStrLn $ "Done."
 
 
 

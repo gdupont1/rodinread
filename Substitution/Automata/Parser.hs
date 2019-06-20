@@ -1,10 +1,11 @@
 module Substitution.Automata.Parser(
-        AutomatonParseError,
+        APWrap,AutomatonParseError,AutomatonParseWarning,
         Pattern(..),
         ape_fragment, ape_position, ape_message,
         compile
     ) where
 
+import Wrap
 import Substitution.Automata
 import Substitution.Automata.Label
 import Substitution.Automata.Builder
@@ -35,6 +36,8 @@ data AutomatonParseError = AutomatonParseError {
     message  :: String
 }
 
+data AutomatonParseWarning
+
 ape_position :: AutomatonParseError -> Int
 ape_position = pos . fragment
 
@@ -47,6 +50,8 @@ ape_message = message
 instance Show AutomatonParseError where
   show pe =
       "Error:" ++ show (ape_position pe) ++ ": at '" ++ (ape_fragment pe) ++ "', " ++ (ape_message pe)
+
+type APWrap = Wrap AutomatonParseError AutomatonParseWarning
 
 guessLabel :: String -> Maybe Label
 guessLabel ""    = Nothing
@@ -85,37 +90,38 @@ glob2 _ p            EmptyPattern = p
 glob2 f p1           p2           = f p1 p2
 
 
-parse :: [PTk] -> Either AutomatonParseError Pattern
+parse :: [PTk] -> APWrap Pattern
 parse input =
-    parse' (Right EmptyPattern) input
-    where parse' :: Either AutomatonParseError Pattern -> [PTk] -> Either AutomatonParseError Pattern
+    parse' (return EmptyPattern) input
+    where parse' :: APWrap Pattern -> [PTk] -> APWrap Pattern
           parse' last [] = last
           parse' last (x:xs) =
               case theToken x of
                 "(" ->
                     case lookForClosing ("(",")") xs of
-                      Nothing -> Left $ AutomatonParseError x "Unclosed parenthesis"
+                      Nothing -> failwith' AutomatonParseError x "Unclosed parenthesis"
                       Just (captured,remainder) ->
-                          let captpattern = Capture <$> parse' (Right EmptyPattern) captured in
+                          let captpattern = Capture <$> parse' (return EmptyPattern) captured in
                               parse' (glob2 Seq <$> last <*> captpattern) remainder
-                ")" -> Left $ AutomatonParseError x "Extra closing parenthesis"
-                "\""->
-                    case lookForNext "\"" xs of
-                      Nothing -> Left $ AutomatonParseError x "Unclosed double quote"
-                      Just (quoted, remainder) ->
-                          let merged = Right $ Lab $ PrintsLike $ foldl (\acc -> ((++) acc) . theToken) [] quoted in
-                              parse' (glob2 Seq <$> last <*> merged) remainder
+                ")" -> failwith' AutomatonParseError x "Extra closing parenthesis"
                 "?" -> parse' (glob  Optional <$> last) xs
                 "*" -> parse' (glob  Repeat   <$> last) xs
                 "+" -> parse' (glob2 Seq      <$> last <*> (glob Repeat <$> last)) xs
                 "|" ->
-                    let remainder = parse' (Right EmptyPattern) xs in
+                    let remainder = parse' (return EmptyPattern) xs in
                         glob2 Or <$> last <*> remainder
-                "." -> parse' (glob2 Seq <$> last <*> (Right $ Lab AnyToken)) xs
-                _  ->
+                "." -> parse' (glob2 Seq <$> last <*> (return $ Lab AnyToken)) xs
+                "!" ->
+                    if null xs then
+                        failwith' AutomatonParseError x "Unexpected pattern end after '!'"
+                    else
+                        case guessLabel $ theToken $ head xs of
+                          Nothing -> failwith' AutomatonParseError (head xs) $ "Unexpected non-identifier element after '!'"
+                          Just la -> parse' (glob2 Seq <$> last <*> (return $ Lab (No la))) $ tail xs
+                _   ->
                     case guessLabel $ theToken x of
-                      Nothing -> Left $ AutomatonParseError x "Unexpected pattern element"
-                      Just la -> parse' (glob2 Seq <$> last <*> (Right $ Lab la)) xs
+                      Nothing -> failwith' AutomatonParseError x "Unexpected pattern element"
+                      Just la -> parse' (glob2 Seq <$> last <*> (return $ Lab la)) xs
 
 
 normalize :: Pattern -> Pattern
@@ -153,7 +159,7 @@ derive :: Pattern -> Automaton
 derive patt =
     getAutomaton $ () |>> emptyAutomaton >>> newPlace >:> setinit >:> derive_ patt
 
-compile :: String -> Either AutomatonParseError (Pattern,Automaton)
+compile :: String -> APWrap (Pattern,Automaton)
 compile input = do
     patt <- parse $ tokenize $ input
     return (patt, derive $ normalize $ patt)

@@ -41,7 +41,7 @@ parseSeesContext elt =
 parseVariable :: Element -> Variable
 parseVariable elt =
     Variable {
-        vaIdentifier = lkOrDef (pref' "identifier") attrskv ""
+        vaIdentifier = tkn $ lkOrDef (pref' "identifier") attrskv ""
     }
     where attrskv = attrToTuple $ elAttribs elt
 
@@ -71,7 +71,7 @@ parseRefinesEvent elt =
 parseParameter :: Element -> Parameter
 parseParameter elt =
     Parameter {
-        paIdentifier = lkOrDef (pref' "identifier") attrskv ""
+        paIdentifier = tkn $ lkOrDef (pref' "identifier") attrskv ""
     }
     where attrskv = attrToTuple $ elAttribs elt
 
@@ -86,7 +86,7 @@ parseGuard elt =
 parseWitness :: Element -> Witness
 parseWitness elt =
     Witness {
-        wiLabel =       lkOrDef (pref' "label"    ) attrskv "",
+        wiLabel = tkn $ lkOrDef (pref' "label"    ) attrskv "",
         wiPred  = tkn $ lkOrDef (pref' "predicate") attrskv ""
     } 
     where attrskv = attrToTuple $ elAttribs elt

@@ -127,7 +127,8 @@ printTeX' tks =
           xShowTeX (TokIdent id) =
               case id of
                 [] -> ""
-                (x:xs) | null xs || (not $ isAlpha x) || (all (not . isAlpha) xs) -> id
+                ('#':xs) -> xs
+                (x:xs) | null xs || (not $ isAlpha x) -> id
                 --_ | '"' `elem` id ->
                 _ | otherwise -> "\\mathit{" ++ escape_ id ++ "}"
           xShowTeX (TokToken TokOpenCBra) = "\\{"

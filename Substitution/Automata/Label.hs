@@ -19,7 +19,6 @@ data Label =
     | AnySpace
     | AnySimpleToken
     | Exactly Token
-    | Among [Token]
     | PrintsLike String
     | BeginCapture
     | EndCapture
@@ -27,11 +26,50 @@ data Label =
     | Skip
     deriving (Eq)
 
+instance Ord Label where
+  compare a b
+      | a == b = EQ
+      | isConsuming a && isConsuming b = EQ
+      | isConsuming a = LT
+      | isConsuming b = GT
+      | isGeneral a && isGeneral b = EQ
+      | isGeneral a = LT
+      | isGeneral b = GT
+      | No _ <- a, No _ <- b = EQ
+      | No _ <- a = LT
+      | No _ <- b = GT
+      | isAny a && isAny b = EQ
+      | isAny a = LT
+      | isAny b = GT
+      | otherwise = EQ
+
+
 isConsuming :: Label -> Bool
 isConsuming Skip = False
 isConsuming BeginCapture = False
 isConsuming EndCapture = False
 isConsuming _ = True
+
+isGeneral :: Label -> Bool
+isGeneral Never = True
+isGeneral Always = True
+isGeneral Undef = True
+isGeneral _ = False
+
+isAny :: Label -> Bool
+isAny AnyToken        = True
+isAny AnyOperator     = True
+isAny AnySpecialIdent = True
+isAny AnyOpIdent      = True
+isAny AnyIdent        = True
+isAny AnySpace        = True
+isAny AnySimpleToken  = True
+isAny _               = False
+
+isSkip :: Label -> Bool
+isSkip Skip = True
+--isSkip EndCapture = True
+isSkip _ = False
 
 instance Show Label where
   show (Never          ) = "!" 
@@ -45,11 +83,10 @@ instance Show Label where
   show (AnySpace       ) = "<space>"
   show (AnySimpleToken ) = "<simple>"
   show (Exactly tk     ) = show tk
-  show (Among tks      ) = show tks
   show (PrintsLike str ) = "'" ++ str ++ "'"
   show (BeginCapture   ) = "("
   show (EndCapture     ) = ")"
-  show (No la          ) = "!" ++ show la
+  show (No la          ) = "¬" ++ show la
   show (Skip           ) = ">>>"
 
 infix 8 //>
@@ -78,7 +115,6 @@ AnySpace        //> _                   = False
 AnySimpleToken  //> (TokToken _)        = True
 AnySimpleToken  //> _                   = False
 Exactly tk      //> tk'                 = tk == tk'
-Among tks       //> tk'                 = tk' `elem` tks
 PrintsLike str  //> tk'                 = (showAscii tk') == str || (showUTF8 tk') == str || (showTeX tk') == str
 No la           //> tk'                 = not (la //> tk')
 

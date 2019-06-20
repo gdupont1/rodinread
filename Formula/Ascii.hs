@@ -7,6 +7,7 @@ Maintainer  : guillaume.dupont55@gmail.com
 
 extended description...
 -}
+{-# LANGUAGE FlexibleInstances,TypeSynonymInstances #-}
 module Formula.Ascii where
 
 import Formula
@@ -110,6 +111,9 @@ instance ShowAscii Token where
   showAscii (TokIdent id) = id
   showAscii (TokSpace s) = showAscii s
   showAscii (TokToken t) = showAscii t
+
+instance ShowAscii Formula where
+  showAscii = printAscii
 
 
 printAscii :: [Token] -> String

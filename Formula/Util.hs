@@ -22,6 +22,10 @@ isMath (TokToken TokDot) = True
 isMath (TokToken TokMid) = True
 isMath _ = False
 
+isSpace :: Token -> Bool
+isSpace (TokSpace _) = True
+isSpace _ = False
+
 functionLike :: Operator -> Bool
 functionLike =
     (flip elem) [

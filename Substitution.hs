@@ -2,64 +2,32 @@
 module Substitution where
 
 --import Text.Read
+import Wrap
+import Ascii
 import Formula
+import qualified Formula.Util as FU
+import qualified Formula.Tokenizer as FT
 import Substitution.Automata
-import Substitution.Automata.Template
-import qualified Substitution.Automata.Template.Parser as TP
+import Substitution.Template
+import Substitution.Message
+import Substitution.Rule
+import qualified Substitution.Template.Parser as TP
 import qualified Substitution.Automata.Reader as R
 import qualified Substitution.Automata.Parser as P
 import Data.List (intercalate,sortBy,group,partition)
 import Data.List.Split (splitOn)
 import Data.Char (isSpace)
 import Data.Maybe (Maybe(..),isJust,fromJust)
-import Ascii
-import Control.Applicative
-import Control.Monad
-import Control.Monad.Trans.Class
+import Control.Monad (foldM,forM_)
+import Control.Monad.Trans.Class (lift)
 
-data Rule = Rule {
-    rule_pattern :: P.Pattern,
-    rule_automaton :: Automaton,
-    rule_template :: Template
-}
-data SubstitutionTable = SubstitutionTable [Rule]
-
-instance Show Rule where
-  show (Rule patt _ temp) = "@" ++ (show patt) ++ "@ => @" ++ (foldl (++) "" $ map show temp) ++ "@"
-
-instance Eq Rule where
-  (Rule _ au te) == (Rule _ au' te') = (au == au') && (te == te')
-
-instance Show SubstitutionTable where
-  show (SubstitutionTable l) = 
-      intercalate "\n" $ map show l
 
 class Substituable a where
-  substitute :: SubstitutionTable -> a -> Either SubstitutionError a
+  substitute :: SubstitutionTable -> a -> SWrap a
   substitute _ = return . id
 
-substituteAll :: Substituable a => SubstitutionTable -> [a] -> Either SubstitutionError [a]
+substituteAll :: Substituable a => SubstitutionTable -> [a] -> SWrap [a]
 substituteAll st = sequence . map (substitute st)
-
-emptySubstitutionTable :: SubstitutionTable
-emptySubstitutionTable = SubstitutionTable []
-
-addrule :: SubstitutionTable -> Rule -> SubstitutionTable
-addrule (SubstitutionTable rs) r = SubstitutionTable (rs ++ [r])
-
-empty :: SubstitutionTable -> Bool
-empty (SubstitutionTable x) = null x
-
-union :: SubstitutionTable -> SubstitutionTable -> SubstitutionTable
-union (SubstitutionTable t1) (SubstitutionTable t2) = SubstitutionTable (t1 ++ t2)
-
-collisions :: SubstitutionTable -> [[Rule]]
-collisions (SubstitutionTable table) =
-    filter ((> 1).length) $ takeAppart table
-    where takeAppart [] = []
-          takeAppart (t:ts) =
-              let (same,others) = partition (== t) ts in
-                  (t:same):(takeAppart others)
 
 data RuleMatch = RuleMatch {
     rule :: Rule,
@@ -82,174 +50,140 @@ lookupPattern (SubstitutionTable table) formula =
               }
               | otherwise = firstValidating ts
 
-data SubstitutionError = SubstitutionError {
-    se_rule :: Rule,
-    se_tokens :: [Token],
-    se_message :: String
-}
+processOptions :: RuleMatch -> SWrap RuleMatch
+processOptions rm =
+    foldM applyIf rm [(ro_chomp,chomppy)]
+    where applyIf :: RuleMatch -> (RuleOptions -> Bool, RuleMatch -> SWrap RuleMatch) -> SWrap RuleMatch
+          applyIf rm (get,fun)
+              | rule_option get (rule rm) = fun rm
+              | otherwise                 = return $ rm
+          chomppy rm =
+              return $ rm { matched = chomp $ matched rm, captures = map chomp $ captures rm }
+          chomp tks =
+              takeout $ dropWhile FU.isSpace $ tks
+          takeout = foldr (\x -> \acc -> if null acc && FU.isSpace x then [] else x:acc) []
 
-instance Show SubstitutionError where
-  show se =
-      "Error when executing rule "
-      ++ (show $ se_rule se) ++ " on sequence '"
-      ++ (foldl (++) "" $ map showAscii $ se_tokens se) ++ "': "
-      ++ (se_message se)
-
-substituteFormula :: SubstitutionTable -> [Token] -> Either SubstitutionError [Token]
-substituteFormula (SubstitutionTable []) input = Right input
-substituteFormula _ [] = Right []
-substituteFormula table input@(i:is) =
-    case lookupPattern table input of
-      Nothing -> (i:) <$> substituteFormula table is
-      Just rm ->
-          case fill (matched rm) (captures rm) (rule_template $ rule rm) of
-            Left err  -> Left $ SubstitutionError (rule rm) (matched rm) $ "at '" ++ tpe_fragment err ++ "': " ++ tpe_message err
-            Right tks -> substituteFormula table (tks ++ remaining rm)
-
-data SubstitutionTableError = SubstitutionTableError {
-    ste_line :: Int,
-    ste_fragment :: String,
-    ste_message :: String
-}
-
-instance Show SubstitutionTableError where
-  show ste =
-      "Error when parsing substitution table: "
-      ++ (if ste_line ste > 0 then "on line " ++ (show $ ste_line ste)
-        ++ (if not $ null $ ste_fragment ste then ", at '" ++ (ste_fragment ste) ++ "'" else "")
-        ++ ": " else "")
-      ++ (ste_message ste)
-
-data SubstitutionTableWarning = SubstitutionTableWarning {
-    stw_line :: Int,
-    stw_message :: String
-}
-
-instance Show SubstitutionTableWarning where
-  show stw =
-      "Warning: on line " ++ (show $ stw_line stw) ++ ": " ++ (stw_message stw)
-
-data Wrap e w a = WrapWarnings [w] a | WrapError e
-
-instance (Show w, Show e) => (Show (Wrap e w a)) where
-  show (WrapWarnings ws _) = intercalate "\n" $ map show ws
-  show (WrapError e) = show e
+match :: Rule -> [Token] -> Maybe RuleMatch
+match rl formula =
+    let rd = R.stepuntilvalidating $ R.reader (rule_automaton rl) formula in
+        if R.validatingState rd then
+            Just $ RuleMatch {
+                rule      = rl,
+                matched   = R.readTokens rd,
+                remaining = R.remainingTokens rd,
+                captures  = R.captures rd
+            }
+        else Nothing
 
 
-instance Functor (Wrap e w) where
-  fmap f (WrapWarnings ws a) = WrapWarnings ws (f a)
-  fmap f (WrapError e) = WrapError e
+trySubstitute1 :: Rule -> [Token] -> SWrap (Bool,[Token])
+trySubstitute1 rl []      = return $ (False,[])
+trySubstitute1 rl formula@(f:fs) =
+    case match rl formula of
+      Nothing -> trySubstitute1 rl fs >>= (\(b,tks) -> return (b,f:tks))
+      Just rm -> do
+          rm' <- processOptions rm
+          tks <- transpose (te_to_se rm') (tw_to_sw rm') $ fill (matched rm) (captures rm) (rule_template $ rule rm')
+          (_,tks') <- trySubstitute1 rl (tks ++ remaining rm')
+          return (True,tks')
+    where te_to_se :: RuleMatch -> TemplateError -> SubstitutionError
+          te_to_se rm err = SubstitutionError (rule rm) (matched rm) $ "at '" ++ tpe_fragment err ++ "': " ++ tpe_message err
+          tw_to_sw :: RuleMatch -> [TemplateWarning] -> [SubstitutionWarning]
+          tw_to_sw _  _   = []
 
-instance Applicative (Wrap e w) where
-  pure a = WrapWarnings [] a
-  (WrapWarnings wf f) <*> (WrapWarnings wa a) = WrapWarnings (wf ++ wa) (f a)
-  (WrapError e) <*> _ = WrapError e
-  _ <*> (WrapError e) = WrapError e
+trySubstitute :: Rule -> [Token] -> SWrap (Bool,[Token])
+trySubstitute rl formula =
+    let l = tail $ iterate trys (return $ (True,formula)) in
+        if not $ cue $ head l then -- stopped after 1st iteration
+            head l -- something like (False,...)
+        else do -- went on
+            (_,tks) <- head $ dropWhile cue l
+            return (True,tks)
+    where trys swt = swt >>= (\(_,tks) -> trySubstitute1 rl tks)
+          cue = fst . getContent (False,[]) -- returns True if iteration should go on i.e. if the element differs from the previous one
 
-instance Monad (Wrap e w) where
-  return = pure
-  (WrapWarnings wa a) >>= f =
-      case f a of
-        WrapWarnings wb b -> WrapWarnings (wa ++ wb) b
-        WrapError e -> WrapError e
-  (WrapError e) >>= f = WrapError e
+trySubstituteAll1 :: [Rule] -> [Token] -> SWrap (Bool,[Token])
+trySubstituteAll1 rls formula =
+    foldM (\(bl,tks) -> \rl -> lor bl $ trySubstitute rl tks) (False,formula) rls
+    where lor :: Bool -> SWrap (Bool,[Token]) -> SWrap (Bool,[Token])
+          lor b sw = sw >>= (\(b',ct) -> return (b || b',ct))
 
+trySubstituteAll :: [Rule] -> [Token] -> SWrap [Token]
+trySubstituteAll rls formula =
+    let l = tail $ iterate trysa (return $ (True,formula)) in do
+        (_,tks) <- head $ dropWhile cue l
+        return tks
+    where trysa swt = swt >>= (\(_,tks) -> trySubstituteAll1 rls tks)
+          cue = fst . getContent (False,[]) -- returns True if iteration should go on i.e. if the element differs from the previous one
 
-newtype WrapT e w m a = WrapT { runWrapT :: m (Wrap e w a) }
-
-instance MonadTrans (WrapT e w) where
-  -- lift :: Monad m => m a -> WrapT m a
-  lift = WrapT . liftM (WrapWarnings [])
-
-instance Monad m => Functor (WrapT e w m) where
-  -- (a -> b) -> WrapT m a -> WrapT m b
-  fmap f sa = WrapT $ (runWrapT sa) >>= (\stw -> return $ fmap f stw)
-
-instance Monad m => Applicative (WrapT e w m) where
-  -- a -> WrapT m a
-  pure = lift . return
-  -- WrapT m (a -> b) -> WrapT m a -> Wrap m b
-  swf <*> swa = WrapT $ do
-      f <- runWrapT swf
-      a <- runWrapT swa
-      return $ f <*> a
-
-instance Monad m => Monad (WrapT e w m) where
-  -- a -> WrapT e w m a
-  return = pure
-  -- WrapT e w m a -> (a -> WrapT e w m b) -> WrapT e w m b
-  swtx >>= fswtb = WrapT $
-      runWrapT swtx >>= (\swx ->
-          case swx of
-            WrapError e -> return $ WrapError e
-            WrapWarnings ws a -> runWrapT (fswtb a) >>= transposeM ws
-      )
-      where transposeM :: Monad m => [w] -> Wrap e w b -> m (Wrap e w b)
-            transposeM _  (WrapError    e    ) = return $ WrapError e
-            transposeM ws (WrapWarnings ws' b) = return $ WrapWarnings (ws ++ ws') b
-
-
-mapWrapT :: (Monad m, Monad n) => (m (Wrap e w a) -> n (Wrap e w b)) -> WrapT e w m a -> WrapT e w n b
-mapWrapT f = WrapT . f . runWrapT
-
-wrapT :: Monad m => Wrap e w a -> WrapT e w m a
-wrapT = WrapT . return
-
-type STWrap = Wrap SubstitutionTableError SubstitutionTableWarning
-type STWrapT = WrapT SubstitutionTableError SubstitutionTableWarning
-
-failwith :: e -> Wrap e w a
-failwith = WrapError
-
-failwith' :: Int -> String -> String -> STWrap a
-failwith' line fragment message = failwith $ SubstitutionTableError line fragment message
-
-pushw :: w -> Wrap e w ()
-pushw warning = WrapWarnings [warning] ()
-
-pushw' :: Int -> String -> STWrap ()
-pushw' line msg = pushw $ SubstitutionTableWarning line msg
+substituteFormula :: [Token] -> SubstitutionTable -> SWrap [Token]
+substituteFormula formula (SubstitutionTable rls) = trySubstituteAll rls formula
 
 fromLine :: Int -> String -> STWrap Rule
 fromLine id part = do
-    (exleft,exright) <- extract part
+    (exleft,exright,extra) <- extract part
     (pa,au) <- parsePattern exleft
-    templ   <- parseTemplate exright
-    return Rule {
+    templtk <- parseTemplateTokens exright
+    templ   <- parseTemplate exright templtk
+    opts    <- parseOptions extra
+    if doesMatch au templtk then
+        pushw' SubstitutionTableWarning id "Rule template matches rule pattern! This can result in infinite loop when processing formulas." ()
+    else return ()
+    return $ Rule {
       rule_pattern = pa,
       rule_automaton = au,
-      rule_template = templ
+      rule_template = templ,
+      rule_options = opts
     }
-    where extract :: String -> STWrap (String,String)
+    where extract :: String -> STWrap (String,String,String)
           extract part = do
               (first,rem) <- getfragment part
               if null rem then
-                  failwith' id part $ "missing template side of substitution rule"
+                  failwith' st_err (id,part) $ "missing template side of substitution rule"
               else do
-                  (second,_) <- getfragment rem
-                  return (first,second)
+                  (second,extra) <- getfragment rem
+                  return (first,second,filter (not . isSpace) extra)
           getfragment :: String -> STWrap (String,String)
           getfragment p =
               case dropWhile (/= '@') p of
-                []     -> failwith' id p $ "syntax error: no '@' detected"
+                []     -> failwith' st_err (id,p) $ "syntax error: no '@' detected"
                 (c:cs) ->
                     let (frag,rem) = span (/= '@') cs in
                         if null rem || head rem /= '@' then
-                            failwith' id p $ "syntax error: unclosed '@'"
+                            failwith' st_err (id,p) $ "syntax error: unclosed '@'"
                         else
                             return (frag, tail rem)
           parsePattern :: String -> STWrap (P.Pattern,Automaton)
-          parsePattern extract =
-              case P.compile extract of
-                Left err ->
-                    failwith' id extract $ "'" ++ P.ape_fragment err ++ "' (" ++ (show $ P.ape_position err) ++ "): " ++ P.ape_message err
-                Right res -> return res
-          parseTemplate :: String -> STWrap Template
-          parseTemplate extract =
-              case TP.template extract of
-                Left err ->
-                    failwith' id extract $ "'" ++ TP.tpe_fragment err ++ "': " ++ TP.tpe_message err
-                Right res -> return res
+          parsePattern extract = transpose (ape_to_ste extract) (apw_to_stw extract) $ P.compile extract
+          parseTemplateTokens :: String -> STWrap [Token]
+          parseTemplateTokens extract = transpose (fpe_to_ste extract) (fpw_to_stw extract) $ FT.tokenize showAscii extract
+          parseTemplate :: String -> [Token] -> STWrap Template
+          parseTemplate extract tks = transpose (te_to_ste extract) (tw_to_stw extract) $ TP.template' tks
+          parseOptions :: String -> STWrap RuleOptions
+          parseOptions extract = foldM parseOption default_options extract
+          parseOption :: RuleOptions -> Char -> STWrap RuleOptions
+          parseOption ros 'c' = return $ ros { ro_chomp = True }
+          parseOption ros o   = pushw' SubstitutionTableWarning id ("Unknown option " ++ show o) ros
+          te_to_ste :: String -> TemplateError -> SubstitutionTableError
+          te_to_ste part err =
+              SubstitutionTableError id part $ "'" ++ tpe_fragment err ++ "': " ++ tpe_message err
+          tw_to_stw :: String -> [TemplateWarning] -> [SubstitutionTableWarning]
+          tw_to_stw _ _ = []
+          ape_to_ste :: String -> P.AutomatonParseError -> SubstitutionTableError
+          ape_to_ste part err = 
+              SubstitutionTableError id part $ "'" ++ P.ape_fragment err ++ "' (" ++ (show $ P.ape_position err) ++ "): " ++ P.ape_message err
+          apw_to_stw :: String -> [P.AutomatonParseWarning] -> [SubstitutionTableWarning]
+          apw_to_stw _ _ = []
+          fpe_to_ste :: String -> FT.FormulaParseError -> SubstitutionTableError
+          fpe_to_ste part pe =
+              SubstitutionTableError id (FT.fpe_fragment pe ++ " (" ++ (show $ FT.fpe_position pe) ++ ")") (FT.fpe_message pe)
+          fpw_to_stw :: String -> [FT.FormulaParseWarning] -> [SubstitutionTableWarning]
+          fpw_to_stw _ _  = []
+          doesMatch :: Automaton -> [Token] -> Bool
+          doesMatch aut = 
+              R.validatingState . R.stepuntilvalidating . R.reader aut
+
+
 
 fromString :: String -> STWrap SubstitutionTable
 fromString s =
@@ -263,5 +197,39 @@ fromFile :: FilePath -> STWrapT IO SubstitutionTable
 fromFile fp =
     (lift $ readFile fp) >>= (wrapT . fromString)
 
+
+simplematch :: String -> String -> String -> IO ()
+simplematch form patt temp = do
+    (p,a) <- cmp
+    t     <- tmp 
+    f     <- tok
+    putStrLn $ "Pattern: "    ++ show p
+    putStrLn $ "Automaton:\n" ++ show a
+    putStrLn $ "Template: "   ++ show t
+    putStrLn $ "Formula: "    ++ show f
+    putStrLn $ "================================="
+    rd  <- return $ R.reader a f
+    putStrLn $ "Reader (init):\n" ++ show rd
+    its <- return $ tail $ takeWhile (not . finished) $ iterate R.step rd
+    forM_ (zip [1..] its) $ (\(i,s) -> putStrLn ("Reader (step " ++ show i ++ "):") >> putStrLn (show s))
+    rd' <- return $ head $ dropWhile (not . finished) $ iterate R.step rd
+    putStrLn $ "Reader (final):\n" ++ show rd'
+    val <- return $ R.validatingState rd'
+    putStrLn $ "Validating? " ++ show val
+    if val then do
+      putStrLn "Captures:"
+      putStrLn $ " $0 \"" ++ show (reverse $ R.readTokens rd') ++ "\""
+      forM_ (zip [1..] (R.captures rd')) $ (\(i,tks) -> putStrLn $ " $" ++ show i ++ " \"" ++ show tks ++ "\"")
+      doOrFail (\e -> putStrLn $ "Error while replacing: " ++ show e)
+               (\r -> putStrLn $ "\nReplacement result: " ++ show r) $
+               fill (R.readTokens rd') (R.captures rd') (t)
+    else return ()
+    putStrLn "==================================="
+    putStrLn "Done."
+    where cmp = doOrFail (fail . show) return $ P.compile patt
+          tmp = doOrFail (fail . show) return $ TP.template temp
+          tok = doOrFail (fail . show) return $ FT.tokenize showAscii form
+          finished = R.finishedorvalidating
+            
 
 

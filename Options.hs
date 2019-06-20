@@ -5,9 +5,12 @@ import Control.Monad.Trans.Class
 import Data.List.Split (splitOn)
 import Data.List (intercalate)
 
+import Wrap
 import TeX
 import Ascii
 import Substitution
+import Substitution.Rule
+import Substitution.Message
 import RodinTheory (Theory)
 import RodinTheory.Read
 import RodinTheory.TeX
@@ -154,7 +157,7 @@ readSubstitutions substs = do
           detectcollisions st = do
               case collisions st of
                 [] -> return st
-                cs -> WrapT $ return $ failwith' 0 "" $ "collisions found in merged substitution table!\n" ++ showCollisions cs
+                cs -> WrapT $ return $ failwith' st_err (0,"") $ "collisions found in merged substitution table!\n" ++ showCollisions cs
           showCollisions collisions =
               foldl showCollision [] $ zip [1..] collisions
           showCollision acc (i,rules) =

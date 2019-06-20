@@ -23,7 +23,7 @@ instance ShowAscii SeesContext where
   showAscii (SeesContext c) = "\n" ++ ind 1 ++ c
 
 instance ShowAscii Variable where
-  showAscii (Variable v) = "\n" ++ ind 1 ++ v
+  showAscii (Variable v) = "\n" ++ ind 1 ++ printAscii v
 
 instance ShowAscii Invariant where
   showAscii (Invariant lb pr) =
@@ -38,7 +38,7 @@ instance ShowAscii RefinesEvent where
   showAscii (RefinesEvent ev) = ev
 
 instance ShowAscii Parameter where
-  showAscii (Parameter pa) = "\n" ++ ind 2 ++ pa
+  showAscii (Parameter pa) = "\n" ++ ind 2 ++ printAscii pa
 
 instance ShowAscii Guard where
   showAscii (Guard lb pr) =
@@ -47,7 +47,7 @@ instance ShowAscii Guard where
 
 instance ShowAscii Witness where
   showAscii (Witness lb pr) =
-      "\n" ++ ind 2 ++ lb ++ ": " ++
+      "\n" ++ ind 2 ++ printAscii lb ++ ": " ++
           (if any isNewline pr then printAsciiLines 3 else printAscii) pr
 
 instance ShowAscii Action where

@@ -5,6 +5,6 @@ import Formula
 import Substitution
 
 instance Substituable [Token] where
-  substitute st fo = substituteFormula st fo
+  substitute st fo = substituteFormula fo st
 
 

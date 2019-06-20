@@ -23,7 +23,7 @@ instance ShowTeX SeesContext where
   showTeX (SeesContext c) = "\n" ++ ind 1 ++ c
 
 instance ShowTeX Variable where
-  showTeX (Variable v) = "\n" ++ ind 1 ++ v
+  showTeX (Variable v) = math $ printTeX' v
 
 instance ShowTeX Invariant where
   showTeX (Invariant lb pr) =
@@ -35,10 +35,10 @@ instance ShowTeX Variant where
       tail $ printTeXLines'' 1 ex
 
 instance ShowTeX RefinesEvent where
-  showTeX (RefinesEvent ev) = ev
+  showTeX (RefinesEvent ev) = italic $ escape_ ev
 
 instance ShowTeX Parameter where
-  showTeX (Parameter pa) = "\n" ++ ind 2 ++ pa
+  showTeX (Parameter pa) = math $ printTeX' $ pa
 
 instance ShowTeX Guard where
   showTeX (Guard lb pr) =
@@ -47,7 +47,7 @@ instance ShowTeX Guard where
 
 instance ShowTeX Witness where
   showTeX (Witness lb pr) =
-      "\n" ++ ind 2 ++ lb ++ ": " ++
+      "\n" ++ ind 2 ++ (math $ printTeX' lb) ++ ": " ++
           (if any isNewline pr then printTeXLines'' 3 else math . printTeX') pr
 
 instance ShowTeX Action where
@@ -62,24 +62,24 @@ instance ShowTeX ConvergenceType where
 
 instance ShowTeX Event where
   showTeX (Event lb co _ re pa gu wi ac) =
-      "\n" ++ ind 1 ++ lb ++ showTeX co ++
-      (if not $ null re then "\n" ++ ind 1 ++ "REFINES " ++ (texlist "," re) else "") ++
-      (if not $ null pa then "\n" ++ ind 1 ++ "ANY"      ++ (texlist ""  pa) else "") ++
-      (if not $ null gu then "\n" ++ ind 1 ++ "WHERE"    ++ (texlist ""  gu) else "") ++
-      (if not $ null wi then "\n" ++ ind 1 ++ "WITH"     ++ (texlist ""  wi) else "") ++
-      (if not $ null ac then "\n" ++ ind 1 ++ "THEN"     ++ (texlist ""  ac) else "") ++
-      "\n" ++ ind 1 ++ "END\n"
+      "\n" ++ ind 1 ++ (bold $ escape_ lb) ++ showTeX co 
+      ++ (if not $ null re then "\n" ++ ind 1 ++ "REFINES " ++ (texlist ","  re) else "")
+      ++ (if not $ null pa then "\n" ++ ind 1 ++ "ANY  "    ++ (texlist ", " pa) else "")
+      ++ (if not $ null gu then "\n" ++ ind 1 ++ "WHERE"    ++ (texlist ""   gu) else "") 
+      ++ (if not $ null wi then "\n" ++ ind 1 ++ "WITH"     ++ (texlist ""   wi) else "") 
+      ++ (if not $ null ac then "\n" ++ ind 1 ++ "THEN"     ++ (texlist ""   ac) else "") 
+      ++ "\n" ++ ind 1 ++ "END\n"
 
 instance ShowTeX Machine where
   showTeX (Machine na re se va inv var ev) =
-      "MACHINE\n" ++ ind 1 ++ na ++
-      (if not $ null re  then "\n" ++ "REFINES"    ++ (texlist "" re ) else "") ++
-      (if not $ null se  then "\n" ++ "SEES"       ++ (texlist "" se ) else "") ++
-      (if not $ null va  then "\n" ++ "VARIABLES"  ++ (texlist "" va ) else "") ++
-      (if not $ null inv then "\n" ++ "INVARIANTS" ++ (texlist "" inv) else "") ++
-      (if not $ null var then "\n" ++ "VARIANT"    ++ (texlist "" var) else "") ++
-      (if not $ null ev  then "\n" ++ "EVENTS"     ++ (texlist "" ev ) else "") ++
-      "\nEND"
+      "MACHINE\n" ++ ind 1 ++ na 
+      ++ (if not $ null re  then "\n" ++ "REFINES"    ++ (texlist ""   re ) else "") 
+      ++ (if not $ null se  then "\n" ++ "SEES"       ++ (texlist ""   se ) else "") 
+      ++ (if not $ null va  then "\n" ++ "VARIABLES  "++ (texlist ", " va ) else "")
+      ++ (if not $ null inv then "\n" ++ "INVARIANTS" ++ (texlist ""   inv) else "") 
+      ++ (if not $ null var then "\n" ++ "VARIANT"    ++ (texlist ""   var) else "") 
+      ++ (if not $ null ev  then "\n" ++ "EVENTS"     ++ (texlist ""   ev ) else "") 
+      ++ "\nEND"
 
 
 

@@ -22,7 +22,7 @@ instance ShowTeX ExtendsContext where
 instance ShowTeX Axiom where
   showTeX (Axiom lb pr _) =
       "\n" ++ ind 1 ++ lb ++ ": " ++
-          (if any isNewline pr then printTeXLines'' 2 else printTeX') pr
+          (if any isNewline pr then printTeXLines'' 2 else math . printTeX') pr
 
 instance ShowTeX Constant where
   showTeX (Constant nm) =
